@@ -137,7 +137,7 @@ def get_functional_meta(header, taskname):
 	meta_data['EffectiveEchoSpacing'] = float(descrip['ec'])/1000
 	meta_data['EchoTime'] = float(descrip['te'])/1000 # check this with Chris/units
 	meta_data['FlipAngle'] = descrip['fa']
-	meta_data['RepetitionTime'] = str(tr)
+	meta_data['RepetitionTime'] = round(tr,4)
 	# slice timing
 	meta_data['SliceTiming'] = get_slice_timing(nslices, tr, mux = mux)
 	total_time = (acq[phase_dim]-1)*meta_data['EffectiveEchoSpacing']
@@ -252,11 +252,9 @@ def bids_subj(subj_path, data_path, nims_path):
 # *** ORGANIZE IN BIDS
 # *****************************
 
-args = sys.argv[1:]
-nims_path = args[0]
-
+nims_paths = sys.argv[1:]
 #study name
-study_id = nims_path.split('/')[3]
+study_id = nims_paths[0].split('/')[3]
 # get data directory to save bids in
 data_path = os.path.join('/data',study_id)
 mkdir(data_path)
@@ -266,7 +264,7 @@ temp_dir = os.path.join(data_path,'temp')
 mkdir(temp_dir)
 
 # bidsify all subjects in path
-for nims_file in glob.iglob(nims_path):
+for nims_file in nims_paths:
 	raw_path = os.path.join('/nimsfs', 'raw', nims_file.split('nimsfs/')[1])
 	try:
 		subj_path  = get_subj_path(raw_path, temp_dir, data_path)
