@@ -1,0 +1,1 @@
+python bids_organizer.py /nimsfs/russpold/uh2/* uh2_id_correction.json
