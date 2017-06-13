@@ -1,7 +1,3 @@
-# TACC
-# destination=weisian@login1.corral.tacc.utexas.edu:/corral-repl/utexas/poldracklab/data/uh2
-# record=/data/uh2/TACC_completed_files.txt
-# sherlock
 destination=sherlock:/scratch/PI/russpold/data/uh2
 record=/data/uh2/sherlock_completed_files.txt
 
