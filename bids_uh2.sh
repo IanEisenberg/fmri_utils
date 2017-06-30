@@ -1,7 +1,4 @@
-# TACC
-# destination=weisian@login1.corral.tacc.utexas.edu:/corral-repl/utexas/poldracklab/data/uh2
-# record=/data/uh2/TACC_completed_files.txt
-# sherlock
+
 destination=sherlock:/oak/stanford/groups/russpold/data/uh2
 record=/data/uh2/sherlock_completed_files.txt
 
@@ -12,7 +9,7 @@ do
 		echo $f already transferred
 	else		
 		# run bids_organizer, which moves files to /data/uh2
-		python bids_organizer.py  $f --rsync_output test --id_correction uh2_id_correction.json --record $record
+		python bids_organizer.py  $f --rsync_output $record --id_correction uh2_id_correction.json --record $record
 
 		rm -r /data/uh2/sub*
 	fi
