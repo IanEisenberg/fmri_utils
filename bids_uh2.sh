@@ -9,13 +9,13 @@ do
 		echo $f already transferred
 	else		
 		# run bids_organizer, which moves files to /data/uh2
-		python bids_organizer.py  $f --rsync_output $record --id_correction uh2_id_correction.json --record $record
+		python bids_organizer.py  $f --rsync_output $destination --id_correction uh2_id_correction.json --record $record
 
 		rm -r /data/uh2/sub*
 	fi
 done
 
-sort $record -o $record
+#sort $record -o $record
 
 
 # move non subject specific folders (e.g.task meta data)
