@@ -46,11 +46,7 @@ def bids_anat(sub_id, anat_dir, anat_path):
         shutil.copyfile(anat_file[0], new_file)
         # deface
         print('\tDefacing...')
-        subprocess.call("pydeface.py %s" % new_file, shell=True)
-        # cleanup
-        os.remove(new_file)
-        defaced_file = new_file.replace('.nii','_defaced.nii')
-        os.rename(defaced_file,new_file)
+        subprocess.call("pydeface %s --outfile %s --force" % (new_file, new_file), shell=True)
     else:
         print('Did not save anat because %s already exists!' % new_file)
 
@@ -227,16 +223,17 @@ def get_slice_timing(nslices, tr, mux = None, order = 'ascending'):
     mux: int, optional mux factor
     """
     if mux:
-        nslices = nslices/8
-        mux_slice_acq_order = range(0,nslices,2) + range(1,nslices,2)
-        mux_slice_acq_time = [float(s)/nslices*tr for s in xrange(nslices)]
-        unmux_slice_acq_order = [nslices*m+s for m in xrange(mux) for s in mux_slice_acq_order]
+        assert nslices%8 == 0
+        nslices = nslices//8
+        mux_slice_acq_order = list(range(0,nslices,2)) + list(range(1,nslices,2))
+        mux_slice_acq_time = [float(s)/nslices*tr for s in range(nslices)]
+        unmux_slice_acq_order = [nslices*m+s for m in range(mux) for s in mux_slice_acq_order]
         unmux_slice_acq_time = mux_slice_acq_time * mux
-        slicetimes = zip(unmux_slice_acq_time,unmux_slice_acq_order)
+        slicetimes = list(zip(unmux_slice_acq_time,unmux_slice_acq_order))
     else:
-        slice_acq_order = range(0,nslices,2) + range(1,nslices,2)
-        slice_acq_time = [float(s)/nslices*tr for s in xrange(nslices)]
-        slicetimes = zip(slice_acq_time,slice_acq_order)
+        slice_acq_order = list(range(0,nslices,2)) + list(range(1,nslices,2))
+        slice_acq_time = [float(s)/nslices*tr for s in range(nslices)]
+        slicetimes = list(zip(slice_acq_time,slice_acq_order))
     #reorder slicetimes by slice number
     sort_index = sorted(enumerate([x[1] for x in slicetimes]), key= lambda x: x[1])
     sorted_slicetimes = [slicetimes[i[0]][0] for i in sort_index]
@@ -287,8 +284,6 @@ def bids_subj(subj_path, bids_dir, nims_path):
         print("BIDSifying %s" % subj_path)
         print("Using nims path: %s" % nims_path)
         print("********************************************")
-        # returns true if all rsyncs pass
-        success = True
         # extract subject ID
         split_path = os.path.normpath(subj_path).split(os.sep)
         sub_id = [x for x in split_path if 'sub' in x][0]
@@ -349,11 +344,10 @@ def bids_subj(subj_path, bids_dir, nims_path):
 # parse arguments
 parser = argparse.ArgumentParser(description='fMRI Analysis Entrypoint Script.')
 
-parser.add_argument('nims_dir', help='Directory of the non-BIDS fmri data', nargs="+")
+parser.add_argument('nims_dir', help='Directory of the non-BIDS fmri data')
 parser.add_argument('bids_dir', help='Directory of the BIDS fmri data')
 parser.add_argument('--study_id', default=None, help='Study ID. If not supplied, the directory above the nims_dir will be used')
 parser.add_argument('--id_correction', help='JSON file that lists subject id corrections for fmri scan IDs')
-parser.add_argument('--record', help='File that lists complete subjects')
 args, unknown = parser.parse_known_args()
 
 # directory with bids data
@@ -371,37 +365,27 @@ if args.id_correction:
     id_correction_dict = json.load(open(args.id_correction,'r'))
 print('Using ID correction json file: %s' % args.id_correction)
 
-# record file
-record = None
-if args.record:
-    record = args.record
-print('Using record file: %s' % record)
-
 #header file
 header = {'Name': study_id, 'BIDSVersion': '1.51-rc1'}
 json.dump(header,open(os.path.join(bids_dir, 'dataset_description.json'),'w'))
 
 # bidsify all subjects in path
 nims_paths = glob.glob(os.path.join(nims_dir, '*'))
-for nims_file in sorted(nims_paths):
-    subj_path  = get_subj_path(nims_file, bids_dir, id_correction_dict)
+for nims_path in sorted(nims_paths):
+    subj_path  = get_subj_path(nims_path, bids_dir, id_correction_dict)
     if subj_path == None:
-        print("Couldn't find subj_path for %s" % nims_file)
+        print("Couldn't find subj_path for %s" % nims_path)
         continue
-    bids_subj(subj_path, bids_dir, nims_file)
-    if success == True and record != None:
-        with open(record, 'a') as f:
-            f.write(nims_file)	
-            f.write('\n')
-        print('Successfully transferred %s' % nims_file)
+    bids_subj(subj_path, bids_dir, nims_path)
 
 # add physio metadata
 if not os.path.exists(os.path.join(bids_dir, 'recording-cardiac_physio.json')):
-    if len(glob.glob(os.path.join(bids_dir, 'sub-*', 'func', '*cardiac*'))) > 0:
-        json.dump(cardiac_bids,open(os.path.join(bids_dir, 'recording-cardiac_physio.json'),'w'))
+    if len(glob.glob(os.path.join(bids_dir, 'sub-*', 'ses-*', 'func', '*cardiac*'))) > 0:
+        json.dump(cardiac_bids, open(os.path.join(bids_dir, 'recording-cardiac_physio.json'),'w'))
 if not os.path.exists(os.path.join(bids_dir, 'recording-respiratory_physio.json')):
-    if len(glob.glob(os.path.join(bids_dir, 'sub-*', 'func', '*respiratory*'))) > 0:
-        json.dump(respiratory_bids,open(os.path.join(bids_dir, 'recording-respiratory_physio.json'),'w'))
+    if len(glob.glob(os.path.join(bids_dir, 'sub-*', 'ses-*', 'func', '*respiratory*'))) > 0:
+        json.dump(respiratory_bids, open(os.path.join(bids_dir, 'recording-respiratory_physio.json'),'w'))
+
 # *****************************
 # *** Cleanup
 # *****************************
