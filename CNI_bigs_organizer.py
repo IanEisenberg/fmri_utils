@@ -76,7 +76,7 @@ def bids_fmap(sub_id, fmap_dir, fmap_path, func_path):
     else:
         print('Did not save fmap_epi because %s already exists!' % os.path.join(fmap_path, fmap_name))
 
-def bids_sbref(sub_id, sbref_dir, func_path, bids_dir):
+def bids_sbref(sub_id, sbref_dir, func_path, data_path):
     """
     Moves and converts an epi folder associated with a sbref
     calibration scan to BIDS format. Assumes tasks are named appropriately
@@ -109,7 +109,7 @@ def bids_sbref(sub_id, sbref_dir, func_path, bids_dir):
     # save sbref image to bids directory
     shutil.copyfile(sbref_files[0], sbref_file)
     # get metadata
-    sbref_meta_path = os.path.join(bids_dir, re.sub('_run[-_][0-9]','',filename) + '.json')
+    sbref_meta_path = os.path.join(data_path, re.sub('_run[-_][0-9]','',filename) + '.json')
     if not os.path.exists(sbref_meta_path):
         try:
             meta_file = [x for x in glob.glob(os.path.join(sbref_dir,'*.json')) 
@@ -120,7 +120,7 @@ def bids_sbref(sub_id, sbref_dir, func_path, bids_dir):
             print("Metadata couldn't be created for %s" % sbref_file)
 
 
-def bids_task(sub_id, task_dir, func_path, bids_dir):
+def bids_task(sub_id, task_dir, func_path, data_path):
     """
     Moves and converts an epi folder associated with a task
     to BIDS format. Assumes tasks are named appropriately
@@ -152,7 +152,7 @@ def bids_task(sub_id, task_dir, func_path, bids_dir):
     # save bold image to bids directory
     shutil.copyfile(task_file[0], bold_file)
     # get epi metadata
-    bold_meta_path = os.path.join(bids_dir, re.sub('_run[-_][0-9]','',taskname) + '_bold.json')
+    bold_meta_path = os.path.join(data_path, re.sub('_run[-_][0-9]','',taskname) + '_bold.json')
     if not os.path.exists(bold_meta_path):
         meta_file = [x for x in glob.glob(os.path.join(task_dir,'*.json')) if 'qa' not in x][0]
         func_meta = get_functional_meta(meta_file, taskname)
@@ -242,7 +242,7 @@ def get_slice_timing(nslices, tr, mux = None, order = 'ascending'):
     sorted_slicetimes = [slicetimes[i[0]][0] for i in sort_index]
     return sorted_slicetimes
 
-def get_subj_path(nims_file, bids_dir, id_correction_dict=None):
+def get_subj_path(nims_file, id_correction_dict=None):
     """
     Takes a path to a nims_file and returns a subject id
     If a dictionary specifying id corrections is provided
@@ -260,7 +260,7 @@ def get_subj_path(nims_file, bids_dir, id_correction_dict=None):
     session = '1'
     if '_' in sub_session:
         session = sub_session.split('_')[1]
-    subj_path = os.path.join(bids_dir, 'sub-'+sub_id, 'ses-'+session)
+    subj_path = os.path.join(data_path, 'sub-'+sub_id, 'ses-'+session)
     return subj_path
 
 def mkdir(path):
@@ -270,10 +270,26 @@ def mkdir(path):
         print('Directory %s already existed' % path)
     return path
 
+def rsync(input, output):
+    if ':' not in output:
+        try: 
+            os.makedirs(output)
+        except OSError:
+            if not os.path.isdir(output):
+                raise
+    else:
+        remote, path = output.split(':')
+        print(remote,path)
+        subprocess.Popen("ssh %s mkdir -p %s" % (remote, path), shell=True).wait()
+    cmd = "rsync -avz --progress --remove-source-files %s %s" % (input, output)
+    p = subprocess.Popen(cmd, shell=True)
+    stdout, stderr = p.communicate()
+    return stderr
+
 # *****************************
 # *** Main BIDS function
 # *****************************
-def bids_subj(subj_path, bids_dir, nims_path):
+def bids_subj(subj_path, data_path, nims_path, output):
     """
     Takes a subject path (the BIDS path to the subject directory),
     a data path (the path to the BIDS directory), and a 
@@ -314,21 +330,32 @@ def bids_subj(subj_path, bids_dir, nims_path):
         for anat_dir in anat_dirs:
             print('\t' + anat_dir)
             bids_anat(base_file_id, anat_dir, anat_path)
+            err = rsync(anat_path, os.path.join(output,stripped_anat_path))
+            if err != None:
+                success = False
+                return success
 
         print('BIDSifying sbref...')
         # task files
         sbref_dirs = sorted(glob.glob(os.path.join(nims_path,'*sbref*')))[::-1]
         for sbref_dir in sbref_dirs:
             print('\t' + sbref_dir)
-            bids_sbref(base_file_id, sbref_dir, func_path, bids_dir)
+            bids_sbref(base_file_id, sbref_dir, func_path, data_path)
+            err = rsync(func_path, os.path.join(output,stripped_func_path))
+            if err != None:
+                success = False
+                return success
 
         print('BIDSifying task...')
         # task files
         task_dirs = sorted(glob.glob(os.path.join(nims_path,'*task*')))[::-1]
         for task_dir in [x for x in task_dirs if 'sbref' not in x]:
             print('\t' + task_dir)
-            bids_task(base_file_id, task_dir, func_path, bids_dir)
-
+            bids_task(base_file_id, task_dir, func_path, data_path)
+            err = rsync(func_path, os.path.join(output,stripped_func_path))
+            if err != None:
+                success = False
+                return success
         # cleanup
         cleanup(func_path)
 
@@ -338,7 +365,12 @@ def bids_subj(subj_path, bids_dir, nims_path):
         for fmap_dir in fmap_dirs:
             print('\t' + fmap_dir)
             bids_fmap(base_file_id, fmap_dir, fmap_path, func_path)
+            err = rsync(fmap_path, os.path.join(output,stripped_fmap_path))
+            if err != None:
+                success = False
+                return success
 
+        return success
 
         
         
@@ -349,28 +381,26 @@ def bids_subj(subj_path, bids_dir, nims_path):
 # parse arguments
 parser = argparse.ArgumentParser(description='fMRI Analysis Entrypoint Script.')
 
-parser.add_argument('nims_dir', help='Directory of the non-BIDS fmri data', nargs="+")
-parser.add_argument('bids_dir', help='Directory of the BIDS fmri data')
-parser.add_argument('--study_id', default=None, help='Study ID. If not supplied, the directory above the nims_dir will be used')
-parser.add_argument('--id_correction', help='JSON file that lists subject id corrections for fmri scan IDs')
+parser.add_argument('nims_paths', help='Directory of the non-BIDS fmri data', nargs="+")
+parser.add_argument('--rsync_output', help='Location for rsync to transfer data')
+parser.add_argument('--id_correction', help='File that lists subject id corrections for fmri scan IDs')
 parser.add_argument('--record', help='File that lists complete subjects')
 args, unknown = parser.parse_known_args()
 
-# directory with bids data
-nims_dir = args.nims_dir
-# bids directory
-bids_dir = args.bids_dir
+# directories to BIDSify
+nims_paths = args.nims_paths
+# output directory
+output = args.rsync_output
 #study name
-if args.study_id:
-    study_id == args.study_id
-else:
-    study_id = nims_dir.strip(os.sep).split(os.sep)[-2]
+study_id = nims_paths[0].split('/')[3]
+# get data directory to save bids in
+data_path = os.path.join('/data',study_id)
+mkdir(data_path)
 # set id_correction_dict if provided
 id_correction_dict = None
 if args.id_correction:
     id_correction_dict = json.load(open(args.id_correction,'r'))
 print('Using ID correction json file: %s' % args.id_correction)
-
 # record file
 record = None
 if args.record:
@@ -379,16 +409,15 @@ print('Using record file: %s' % record)
 
 #header file
 header = {'Name': study_id, 'BIDSVersion': '1.51-rc1'}
-json.dump(header,open(os.path.join(bids_dir, 'dataset_description.json'),'w'))
+json.dump(header,open(os.path.join(data_path, 'dataset_description.json'),'w'))
 
 # bidsify all subjects in path
-nims_paths = glob.glob(os.path.join(nims_dir, '*'))
 for nims_file in sorted(nims_paths):
-    subj_path  = get_subj_path(nims_file, bids_dir, id_correction_dict)
+    subj_path  = get_subj_path(nims_file, id_correction_dict)
     if subj_path == None:
         print("Couldn't find subj_path for %s" % nims_file)
         continue
-    bids_subj(subj_path, bids_dir, nims_file)
+    success = bids_subj(subj_path, data_path, nims_file, output)
     if success == True and record != None:
         with open(record, 'a') as f:
             f.write(nims_file)	
@@ -396,13 +425,13 @@ for nims_file in sorted(nims_paths):
         print('Successfully transferred %s' % nims_file)
 
 # add physio metadata
-if not os.path.exists(os.path.join(bids_dir, 'recording-cardiac_physio.json')):
-    if len(glob.glob(os.path.join(bids_dir, 'sub-*', 'func', '*cardiac*'))) > 0:
-        json.dump(cardiac_bids,open(os.path.join(bids_dir, 'recording-cardiac_physio.json'),'w'))
-if not os.path.exists(os.path.join(bids_dir, 'recording-respiratory_physio.json')):
-    if len(glob.glob(os.path.join(bids_dir, 'sub-*', 'func', '*respiratory*'))) > 0:
-        json.dump(respiratory_bids,open(os.path.join(bids_dir, 'recording-respiratory_physio.json'),'w'))
+if not os.path.exists(os.path.join(data_path, 'recording-cardiac_physio.json')):
+    if len(glob.glob(os.path.join(data_path, 'sub-*', 'func', '*cardiac*'))) > 0:
+        json.dump(cardiac_bids,open(os.path.join(data_path, 'recording-cardiac_physio.json'),'w'))
+if not os.path.exists(os.path.join(data_path, 'recording-respiratory_physio.json')):
+    if len(glob.glob(os.path.join(data_path, 'sub-*', 'func', '*respiratory*'))) > 0:
+        json.dump(respiratory_bids,open(os.path.join(data_path, 'recording-respiratory_physio.json'),'w'))
 # *****************************
 # *** Cleanup
 # *****************************
-cleanup(bids_dir)
+cleanup(data_path)
