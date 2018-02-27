@@ -11,7 +11,7 @@ if grep $f $record; then
 	echo $f already transferred
 else		
 	# run bids_organizer, which moves files to /data/uh2
-	python bids_organizer.py  $f --rsync_output $destination --id_correction uh2_id_correction.json --record $record
+	python CNI_bids_organizer.py  $f --rsync_output $destination --id_correction uh2_id_correction.json --record $record
 
 	rm -r /data/uh2/sub*
 fi

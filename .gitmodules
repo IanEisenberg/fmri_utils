@@ -1,0 +1,3 @@
+[submodule "pydeface"]
+	path = pydeface
+	url = https://github.com/poldracklab/pydeface
