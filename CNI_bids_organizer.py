@@ -281,10 +281,10 @@ def rsync(input, output):
         remote, path = output.split(':')
         print(remote,path)
         subprocess.Popen("ssh %s mkdir -p %s" % (remote, path), shell=True).wait()
-    cmd = "rsync -avz --progress --remove-source-files %s %s" % (input, output)
-    p = subprocess.Popen(cmd, shell=True)
-    stdout, stderr = p.communicate()
-    return stderr
+    cmd = "rsync -aHAXxv --progress --remove-source-files %s %s" % (input, output)
+    p = subprocess.call(cmd, shell=True)
+    success = (p==0)
+    return success
 
 # *****************************
 # *** Main BIDS function
@@ -330,9 +330,11 @@ def bids_subj(subj_path, data_path, nims_path, output):
         for anat_dir in anat_dirs:
             print('\t' + anat_dir)
             bids_anat(base_file_id, anat_dir, anat_path)
-            err = rsync(anat_path, os.path.join(output,stripped_anat_path))
-            if err != None:
-                success = False
+            # cleanup 
+            cleanup(anat_path)
+            # transfer
+            success = rsync(anat_path, os.path.join(output,stripped_anat_path))
+            if success == False:
                 return success
 
         print('BIDSifying sbref...')
@@ -341,9 +343,11 @@ def bids_subj(subj_path, data_path, nims_path, output):
         for sbref_dir in sbref_dirs:
             print('\t' + sbref_dir)
             bids_sbref(base_file_id, sbref_dir, func_path, data_path)
-            err = rsync(func_path, os.path.join(output,stripped_func_path))
-            if err != None:
-                success = False
+            # cleanup 
+            cleanup(func_path)
+            # transfer
+            success = rsync(func_path, os.path.join(output,stripped_func_path))
+            if success == False:
                 return success
 
         print('BIDSifying task...')
@@ -352,12 +356,12 @@ def bids_subj(subj_path, data_path, nims_path, output):
         for task_dir in [x for x in task_dirs if 'sbref' not in x]:
             print('\t' + task_dir)
             bids_task(base_file_id, task_dir, func_path, data_path)
-            err = rsync(func_path, os.path.join(output,stripped_func_path))
-            if err != None:
-                success = False
+            # cleanup 
+            cleanup(func_path)
+            # transfer
+            success = rsync(func_path, os.path.join(output,stripped_func_path))
+            if success == False:
                 return success
-        # cleanup
-        cleanup(func_path)
 
         print('BIDSifying fmap...')
         # fmap files
@@ -365,9 +369,11 @@ def bids_subj(subj_path, data_path, nims_path, output):
         for fmap_dir in fmap_dirs:
             print('\t' + fmap_dir)
             bids_fmap(base_file_id, fmap_dir, fmap_path, func_path)
-            err = rsync(fmap_path, os.path.join(output,stripped_fmap_path))
-            if err != None:
-                success = False
+            # cleanup 
+            cleanup(fmap_path)
+            # transfer
+            success = rsync(fmap_path, os.path.join(output,stripped_fmap_path))
+            if success == False:
                 return success
 
         return success
@@ -420,10 +426,11 @@ for nims_file in sorted(nims_paths):
     success = bids_subj(subj_path, data_path, nims_file, output)
     if success == True and record != None:
         with open(record, 'a') as f:
-            f.write(nims_file)	
+            f.write(nims_file)  
             f.write('\n')
         print('Successfully transferred %s' % nims_file)
-
+    else:
+        print('Transfer failed')
 # add physio metadata
 if not os.path.exists(os.path.join(data_path, 'recording-cardiac_physio.json')):
     if len(glob.glob(os.path.join(data_path, 'sub-*', 'func', '*cardiac*'))) > 0:
@@ -431,7 +438,4 @@ if not os.path.exists(os.path.join(data_path, 'recording-cardiac_physio.json')):
 if not os.path.exists(os.path.join(data_path, 'recording-respiratory_physio.json')):
     if len(glob.glob(os.path.join(data_path, 'sub-*', 'func', '*respiratory*'))) > 0:
         json.dump(respiratory_bids,open(os.path.join(data_path, 'recording-respiratory_physio.json'),'w'))
-# *****************************
-# *** Cleanup
-# *****************************
-cleanup(data_path)
+
