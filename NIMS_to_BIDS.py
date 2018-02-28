@@ -149,7 +149,7 @@ def bids_task(sub_id, task_dir, func_path, bids_dir):
     shutil.copyfile(task_file[0], bold_file)
     # get epi metadata
     bold_meta_path = os.path.join(bids_dir, re.sub('_run[-_][0-9]','',taskname) + '.json')
-    bold_meta_path = bold_meta_path.replace('_ssg', '_bold')
+    bold_meta_path = bold_meta_path.replace('_ssg', '_bold').replace('task_', 'task-').replace('run_','run-')
     if not os.path.exists(bold_meta_path):
         meta_file = [x for x in glob.glob(os.path.join(task_dir,'*.json')) if 'qa' not in x][0]
         func_meta = get_functional_meta(meta_file, taskname)
