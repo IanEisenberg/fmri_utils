@@ -242,26 +242,36 @@ def get_slice_timing(nslices, tr, mux = None, order = 'ascending'):
     sorted_slicetimes = [slicetimes[i[0]][0] for i in sort_index]
     return sorted_slicetimes
 
-def get_subj_path(nims_file, bids_dir, id_correction_dict=None):
+def get_subj_path(nims_path, bids_dir, id_correction_dict=None):
     """
-    Takes a path to a nims_file and returns a subject id
+    Takes a nims path and returns a subject id
     If a dictionary specifying id corrections is provided
     (in the form of a json file with exam numbers as keys and
     ids as values), the function will return the corrected id number
     """
-    meta_json = glob.glob(os.path.join(nims_file,'*','*1.json'))[0]
-    meta_file = json.load(open(meta_json,'r'))
-    exam_number = str(meta_file['exam_number'])
-    sub_session = str(meta_file['patient_id'].split('@')[0])
+    exam_number = nims_path.split('_')[-1]
+    try:
+        meta_json = glob.glob(os.path.join(nims_path,'*','*1.json'))[0]
+        meta_file = json.load(open(meta_json,'r'))
+        json_exam_number = str(meta_file['exam_number'])
+        sub_session = str(meta_file['patient_id'].split('@')[0])
+        assert json_exam_number == exam_number
+    except IndexError:
+        print('No meta json found for %s' % nims_path)
+        sub_session = None
+    
     # correct session if provided
     if id_correction_dict:
         sub_session = id_correction_dict.get(exam_number,sub_session)
-    sub_id = sub_session.split('_')[0]
-    session = '1'
-    if '_' in sub_session:
-        session = sub_session.split('_')[1]
-    subj_path = os.path.join(bids_dir, 'sub-'+sub_id, 'ses-'+session)
-    return subj_path
+    if sub_session is not None:
+        sub_id = sub_session.split('_')[0]
+        session = '1'
+        if '_' in sub_session:
+            session = sub_session.split('_')[1]
+        subj_path = os.path.join(bids_dir, 'sub-'+sub_id, 'ses-'+session)
+        return subj_path
+    else:
+        return None
 
 def mkdir(path):
     try:
@@ -367,10 +377,11 @@ id_correction_dict = None
 if args.id_correction:
     id_correction_dict = json.load(open(args.id_correction,'r'))
 print('Using ID correction json file: %s' % args.id_correction)
-
 #header file
 header = {'Name': study_id, 'BIDSVersion': '1.51-rc1'}
 json.dump(header,open(os.path.join(bids_dir, 'dataset_description.json'),'w'))
+# error file
+error_file = os.path.join(bids_dir, 'error_record.txt')
 
 # bidsify all subjects in path
 nims_paths = glob.glob(os.path.join(nims_dir, '*'))
@@ -379,6 +390,8 @@ for i, nims_path in enumerate(sorted(nims_paths)):
     subj_path  = get_subj_path(nims_path, bids_dir, id_correction_dict)
     if subj_path == None:
         print("Couldn't find subj_path for %s" % nims_path)
+        with open(error_file, 'a') as filey:
+            filey.write("Couldn't find subj_path for %s\n" % nims_path)
         continue
     bids_subj(subj_path, bids_dir, nims_path)
 
