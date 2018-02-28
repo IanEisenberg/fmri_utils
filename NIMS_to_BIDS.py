@@ -184,7 +184,7 @@ def get_functional_meta(json_file, taskname):
     """
     meta_file = json.load(open(json_file,'r'))
     meta_data = {}
-    mux = meta_file['num_slices']
+    mux = meta_file['num_bands']
     nslices = meta_file['num_slices'] * mux
     tr = meta_file['tr']
     n_echoes = meta_file['acquisition_matrix_y'] 
@@ -208,7 +208,7 @@ def get_fmap_epi_meta(json_file, intended_list):
     """
     meta_file = json.load(open(json_file,'r'))
     meta_data = {}
-    mux = meta_file['num_slices']
+    mux = meta_file['num_bands']
     nslices = meta_file['num_slices'] * mux
     n_echoes = meta_file['acquisition_matrix_y'] 
     # fill in metadata
@@ -226,8 +226,8 @@ def get_slice_timing(nslices, tr, mux = None, order = 'ascending'):
     mux: int, optional mux factor
     """
     if mux:
-        assert nslices%8 == 0
-        nslices = nslices//8
+        assert nslices%mux == 0
+        nslices = nslices//mux
         mux_slice_acq_order = list(range(0,nslices,2)) + list(range(1,nslices,2))
         mux_slice_acq_time = [float(s)/nslices*tr for s in range(nslices)]
         unmux_slice_acq_order = [nslices*m+s for m in range(mux) for s in mux_slice_acq_order]
