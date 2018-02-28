@@ -31,6 +31,15 @@ respiratory_bids = {
 # *****************************
 # *** HELPER FUNCTIONS
 # *****************************
+def clean_file(f):
+    f = f.replace('task_', 'task-').replace('run_','run-').replace('_ssg','')
+    return f
+
+def cleanup(path):
+    for f in glob.glob(os.path.join(path, '*')):
+        new_name = clean_file(f)
+        os.rename(f,new_name)
+
 def bids_anat(sub_id, anat_dir, anat_path):
     """
     Moves and converts a anatomical folder associated with a T1 or T2
@@ -89,7 +98,7 @@ def bids_sbref(sub_id, sbref_dir, func_path, bids_dir):
         return
 
     # bring to subject directory and divide into sbref and bold
-    sbref_file = os.path.join(func_path, sub_id + '_' + filename + '.nii.gz')
+    sbref_file = clean_file(os.path.join(func_path, sub_id + '_' + filename + '.nii.gz'))
     # check if file exists. If it does, check if the saved file has more time points
     if os.path.exists(sbref_file):
         print('%s already exists!' % sbref_file)
@@ -148,8 +157,8 @@ def bids_task(sub_id, task_dir, func_path, bids_dir):
     # save bold image to bids directory
     shutil.copyfile(task_file[0], bold_file)
     # get epi metadata
-    bold_meta_path = os.path.join(bids_dir, re.sub('_run[-_][0-9]','',taskname) + '.json')
-    bold_meta_path = bold_meta_path.replace('_ssg', '_bold').replace('task_', 'task-').replace('run_','run-')
+    bold_meta_path = os.path.join(bids_dir, re.sub('_run[-_][0-9]','',taskname) + '_bold.json')
+    bold_meta_path = clean_file(bold_meta_path)
     if not os.path.exists(bold_meta_path):
         meta_file = [x for x in glob.glob(os.path.join(task_dir,'*.json')) if 'qa' not in x][0]
         func_meta = get_functional_meta(meta_file, taskname)
@@ -169,12 +178,6 @@ def bids_task(sub_id, task_dir, func_path, bids_dir):
             f = np.loadtxt(pfile)
             np.savetxt(new_physio_file, f, delimiter = '\t')
         shutil.rmtree(os.path.join(func_path, physio_file))
-        
-
-def cleanup(path):
-    for f in glob.glob(os.path.join(path, '*')):
-        new_name = f.replace('task_', 'task-').replace('run_','run-').replace('_ssg','')
-        os.rename(f,new_name)
 
 def get_functional_meta(json_file, taskname):
     """
