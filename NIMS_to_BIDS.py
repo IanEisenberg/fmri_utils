@@ -114,7 +114,7 @@ def bids_sbref(sub_id, sbref_dir, func_path, bids_dir):
     # save sbref image to bids directory
     shutil.copyfile(sbref_files[0], sbref_file)
     # get metadata
-    sbref_meta_path = os.path.join(bids_dir, re.sub('_run[-_][0-9]','',filename) + '.json')
+    sbref_meta_path = clean_file(os.path.join(bids_dir, re.sub('_run[-_][0-9]','',filename) + '.json'))
     if not os.path.exists(sbref_meta_path):
         try:
             meta_file = [x for x in glob.glob(os.path.join(sbref_dir,'*.json')) 
@@ -375,7 +375,8 @@ json.dump(header,open(os.path.join(bids_dir, 'dataset_description.json'),'w'))
 
 # bidsify all subjects in path
 nims_paths = glob.glob(os.path.join(nims_dir, '*'))
-for nims_path in sorted(nims_paths):
+for i, nims_path in enumerate(sorted(nims_paths)):
+    print("BIDSifying path %s out of %s" % (str(i), str(len(nims_paths))))
     subj_path  = get_subj_path(nims_path, bids_dir, id_correction_dict)
     if subj_path == None:
         print("Couldn't find subj_path for %s" % nims_path)
