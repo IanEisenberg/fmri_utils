@@ -124,7 +124,7 @@ def bids_task(sub_id, task_dir, func_path, bids_dir):
     """
     task_index = task_dir.index('task')
     taskname = task_dir[task_index:]
-    task_file = glob.glob(os.path.join(task_dir,'*.nii.gz'))
+    task_file = [f for f in glob.glob(os.path.join(task_dir,'*.nii.gz')) if "fieldmap" not in f]
     assert len(task_file) <= 1, "More than one func file found in directory %s" % task_dir
     if len(task_file) == 0:
         print('Skipping %s, no nii.gz file found' % task_dir)
@@ -187,7 +187,7 @@ def get_functional_meta(json_file, taskname):
     n_echoes = meta_file['acquisition_matrix_y'] 
 
     # fill in metadata
-    meta_data['TaskName'] = taskname
+    meta_data['TaskName'] = taskname.split('_')[1]
     meta_data['EffectiveEchoSpacing'] = meta_file['effective_echo_spacing']
     meta_data['EchoTime'] = meta_file['te']
     meta_data['FlipAngle'] = meta_file['flip_angle']
