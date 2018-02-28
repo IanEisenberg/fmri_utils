@@ -52,10 +52,9 @@ def bids_anat(sub_id, anat_dir, anat_path):
     assert len(anat_file) == 1, "More than one anat file found in directory %s" % anat_dir
     new_file = os.path.join(anat_path, sub_id + '_' + anat_type + '.nii.gz')
     if not os.path.exists(new_file):
-        shutil.copyfile(anat_file[0], new_file)
         # deface
         print('\tDefacing...')
-        subprocess.call("pydeface %s --outfile %s --force" % (new_file, new_file), shell=True)
+        subprocess.call("pydeface %s --outfile %s" % (anat_file[0], new_file), shell=True)
     else:
         print('Did not save anat because %s already exists!' % new_file)
 
@@ -376,7 +375,7 @@ json.dump(header,open(os.path.join(bids_dir, 'dataset_description.json'),'w'))
 # bidsify all subjects in path
 nims_paths = glob.glob(os.path.join(nims_dir, '*'))
 for i, nims_path in enumerate(sorted(nims_paths)):
-    print("BIDSifying path %s out of %s" % (str(i), str(len(nims_paths))))
+    print("BIDSifying path %s out of %s" % (str(i+1), str(len(nims_paths))))
     subj_path  = get_subj_path(nims_path, bids_dir, id_correction_dict)
     if subj_path == None:
         print("Couldn't find subj_path for %s" % nims_path)
