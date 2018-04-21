@@ -361,6 +361,7 @@ parser.add_argument('nims_dir', help='Directory of the non-BIDS fmri data')
 parser.add_argument('bids_dir', help='Directory of the BIDS fmri data')
 parser.add_argument('--study_id', default=None, help='Study ID. If not supplied, the directory above the nims_dir will be used')
 parser.add_argument('--id_correction', help='JSON file that lists subject id corrections for fmri scan IDs')
+parser.add_argument('--nims_paths', nargs='+', default=None)
 args, unknown = parser.parse_known_args()
 
 # directory with bids data
@@ -384,7 +385,10 @@ json.dump(header,open(os.path.join(bids_dir, 'dataset_description.json'),'w'))
 error_file = os.path.join(bids_dir, 'error_record.txt')
 
 # bidsify all subjects in path
-nims_paths = glob.glob(os.path.join(nims_dir, '*'))
+if args.nims_paths is None:
+    nims_paths = glob.glob(os.path.join(nims_dir, '*'))
+else:
+    nims_paths = [glob.glob(os.path.join(nims_dir, '*'+path))[0] for path in args.nims_paths]
 for i, nims_path in enumerate(sorted(nims_paths)):
     print("BIDSifying path %s out of %s" % (str(i+1), str(len(nims_paths))))
     subj_path  = get_subj_path(nims_path, bids_dir, id_correction_dict)
