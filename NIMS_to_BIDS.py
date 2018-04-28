@@ -53,10 +53,10 @@ def bids_anat(sub_id, anat_dir, anat_path):
     new_file = os.path.join(anat_path, sub_id + '_' + anat_type + '.nii.gz')
     if not os.path.exists(new_file):
         # deface
-        print('\tDefacing...')
+        to_write.write('\tDefacing...\n')
         subprocess.call("pydeface %s --outfile %s" % (anat_file[0], new_file), shell=True)
     else:
-        print('Did not save anat because %s already exists!' % new_file)
+        to_write.write('Did not save anat because %s already exists!\n' % new_file)
 
 def bids_fmap(sub_id, fmap_dir, fmap_path, func_path):
     """
@@ -78,7 +78,7 @@ def bids_fmap(sub_id, fmap_dir, fmap_path, func_path):
         fieldmap_meta = {'Units': 'Hz', 'IntendedFor': func_runs}
         json.dump(fieldmap_meta,open(os.path.join(fmap_path, sub_id + '_fieldmap.json'),'w'))
     else:
-        print('Did not save fmap_epi because %s already exists!' % os.path.join(fmap_path, fmap_name))
+        to_write.write('Did not save fmap_epi because %s already exists!\n' % os.path.join(fmap_path, fmap_name))
 
 def bids_sbref(sub_id, sbref_dir, func_path, bids_dir):
     """
@@ -93,23 +93,23 @@ def bids_sbref(sub_id, sbref_dir, func_path, bids_dir):
     sbref_files = [i for i in sbref_files if 'phase' not in i]
     assert len(sbref_files) <= 1, "More than one func file found in directory %s" % sbref_dir
     if len(sbref_files) == 0:
-        print('Skipping %s, no nii.gz file found' % sbref_dir)
+        to_write.write('Skipping %s, no nii.gz file found\n' % sbref_dir)
         return
 
     # bring to subject directory and divide into sbref and bold
     sbref_file = clean_file(os.path.join(func_path, sub_id + '_' + filename + '.nii.gz'))
     # check if file exists. If it does, check if the saved file has more time points
     if os.path.exists(sbref_file):
-        print('%s already exists!' % sbref_file)
+        to_write.write('%s already exists!\n' % sbref_file)
         saved_shape = nib.load(sbref_file).shape
         current_shape = nib.load(sbref_files[0]).shape
-        print('Dimensions of saved image: %s' % list(saved_shape))
-        print('Dimensions of current image: %s' % list(current_shape))
+        to_write.write('Dimensions of saved image: %s\n' % list(saved_shape))
+        to_write.write('Dimensions of current image: %s\n' % list(current_shape))
         if (current_shape[-1] <= saved_shape[-1]):
-            print('Current image has fewer or equivalent time points than saved image. Exiting...')
+            to_write.write('Current image has fewer or equivalent time points than saved image. Exiting...\n')
             return
         else:
-            print('Current image has more time points than saved image. Overwriting...')
+            to_write.write('Current image has more time points than saved image. Overwriting...\n')
     # save sbref image to bids directory
     shutil.copyfile(sbref_files[0], sbref_file)
     # get metadata
@@ -121,7 +121,7 @@ def bids_sbref(sub_id, sbref_dir, func_path, bids_dir):
             func_meta = get_functional_meta(meta_file, filename)
             json.dump(func_meta,open(sbref_meta_path,'w'))
         except IndexError:
-            print("Metadata couldn't be created for %s" % sbref_file)
+            to_write.write("Metadata couldn't be created for %s\n" % sbref_file)
 
 
 def bids_task(sub_id, task_dir, func_path, bids_dir):
@@ -135,7 +135,7 @@ def bids_task(sub_id, task_dir, func_path, bids_dir):
     task_file = [f for f in glob.glob(os.path.join(task_dir,'*.nii.gz')) if "fieldmap" not in f]
     assert len(task_file) <= 1, "More than one func file found in directory %s" % task_dir
     if len(task_file) == 0:
-        print('Skipping %s, no nii.gz file found' % task_dir)
+        to_write.write('Skipping %s, no nii.gz file found\n' % task_dir)
         return
 
     # bring to subject directory and divide into sbref and bold
@@ -143,16 +143,16 @@ def bids_task(sub_id, task_dir, func_path, bids_dir):
     bold_file = bold_file.replace('_ssg', '_bold')
     # check if file exists. If it does, check if the saved file has more time points
     if os.path.exists(bold_file):
-        print('%s already exists!' % bold_file)
+        to_write.write('%s already exists!\n' % bold_file)
         saved_shape = nib.load(bold_file).shape
         current_shape = nib.load(task_file[0]).shape
-        print('Dimensions of saved image: %s' % list(saved_shape))
-        print('Dimensions of current image: %s' % list(current_shape))
+        to_write.write('Dimensions of saved image: %s\n' % list(saved_shape))
+        to_write.write('Dimensions of current image: %s\n' % list(current_shape))
         if (current_shape[-1] <= saved_shape[-1]):
-            print('Current image has fewer or equal time points than saved image. Exiting...')
+            to_write.write('Current image has fewer or equal time points than saved image. Exiting...\n')
             return
         else:
-            print('Current image has more time points than saved image. Overwriting...')
+            to_write.write('Current image has more time points than saved image. Overwriting...\n')
     # save bold image to bids directory
     shutil.copyfile(task_file[0], bold_file)
     # get epi metadata
@@ -257,7 +257,7 @@ def get_subj_path(nims_path, bids_dir, id_correction_dict=None):
         sub_session = str(meta_file['patient_id'].split('@')[0])
         assert json_exam_number == exam_number
     except IndexError:
-        print('No meta json found for %s' % nims_path)
+        to_write.write('No meta json found for %s\n' % nims_path)
         sub_session = None
     
     # correct session if provided
@@ -277,7 +277,7 @@ def mkdir(path):
     try:
         os.mkdir(path)
     except OSError:
-        print('Directory %s already existed' % path)
+        to_write.write('Directory %s already existed\n' % path)
     return path
 
 # *****************************
@@ -291,12 +291,12 @@ def bids_subj(subj_path, bids_dir, nims_path):
     and moves/converts that subject's data to BIDS
     """
     if os.path.exists(subj_path):
-        print("Path %s already exists. Skipping." % subj_path)
+        to_write.write("Path %s already exists. Skipping.\n\n" % subj_path)
     else:
-        print("********************************************")
-        print("BIDSifying %s" % subj_path)
-        print("Using nims path: %s" % nims_path)
-        print("********************************************")
+        to_write.write("********************************************\n")
+        to_write.write("BIDSifying %s\n" % subj_path)
+        to_write.write("Using nims path: %s\n" % nims_path)
+        to_write.write("********************************************\n\n")
         # extract subject ID
         split_path = os.path.normpath(subj_path).split(os.sep)
         sub_id = [x for x in split_path if 'sub' in x][0]
@@ -315,36 +315,36 @@ def bids_subj(subj_path, bids_dir, nims_path):
         stripped_func_path = os.sep.join(func_path.split(os.sep)[-3:-1])
         stripped_fmap_path = os.sep.join(fmap_path.split(os.sep)[-3:-1])
 
-        print(anat_path)
-        print('BIDSifying anatomy...')
+        to_write.write(anat_path)
+        to_write.write('\nBIDSifying anatomy...\n')
         # anat files
         anat_dirs = sorted(glob.glob(os.path.join(nims_path,'*anat*')))[::-1]
         for anat_dir in anat_dirs:
-            print('\t' + anat_dir)
+            to_write.write('\t' + anat_dir + '\n')
             bids_anat(base_file_id, anat_dir, anat_path)
 
-        print('BIDSifying sbref...')
+        to_write.write('\nBIDSifying sbref...\n')
         # task files
         sbref_dirs = sorted(glob.glob(os.path.join(nims_path,'*sbref*')))[::-1]
         for sbref_dir in sbref_dirs:
-            print('\t' + sbref_dir)
+            to_write.write('\t' + sbref_dir + '\n')
             bids_sbref(base_file_id, sbref_dir, func_path, bids_dir)
 
-        print('BIDSifying task...')
+        to_write.write('\nBIDSifying task...\n')
         # task files
         task_dirs = sorted(glob.glob(os.path.join(nims_path,'*task*')))[::-1]
         for task_dir in [x for x in task_dirs if 'sbref' not in x]:
-            print('\t' + task_dir)
+            to_write.write('\t' + task_dir + '\n')
             bids_task(base_file_id, task_dir, func_path, bids_dir)
 
         # cleanup
         cleanup(func_path)
 
-        print('BIDSifying fmap...')
+        to_write.write('\nBIDSifying fmap...\n')
         # fmap files
         fmap_dirs = sorted(glob.glob(os.path.join(nims_path,'*fieldmap*')))[::-1]
         for fmap_dir in fmap_dirs:
-            print('\t' + fmap_dir)
+            to_write.write('\t' + fmap_dir + '\n')
             bids_fmap(base_file_id, fmap_dir, fmap_path, func_path)
 
 
@@ -362,6 +362,7 @@ parser.add_argument('bids_dir', help='Directory of the BIDS fmri data')
 parser.add_argument('--study_id', default=None, help='Study ID. If not supplied, the directory above the nims_dir will be used')
 parser.add_argument('--id_correction', help='JSON file that lists subject id corrections for fmri scan IDs')
 parser.add_argument('--nims_paths', nargs='+', default=None)
+parser.add_argument('--write_out', default=None)
 args, unknown = parser.parse_known_args()
 
 # directory with bids data
@@ -373,11 +374,18 @@ if args.study_id:
     study_id == args.study_id
 else:
     study_id = nims_dir.strip(os.sep).split(os.sep)[-2]
+# write_out
+if args.write_out:
+    write_out = args.write_out
+else:
+    write_out = '%s_NIMS_to_BIDS.txt' % study_id
+to_write = open(write_out, 'w')
+
 # set id_correction_dict if provided
 id_correction_dict = None
 if args.id_correction:
     id_correction_dict = json.load(open(args.id_correction,'r'))
-print('Using ID correction json file: %s' % args.id_correction)
+to_write.write('Using ID correction json file: %s\n' % args.id_correction)
 #header file
 header = {'Name': study_id, 'BIDSVersion': '1.51-rc1'}
 json.dump(header,open(os.path.join(bids_dir, 'dataset_description.json'),'w'))
@@ -390,14 +398,15 @@ if args.nims_paths is None:
 else:
     nims_paths = [glob.glob(os.path.join(nims_dir, '*'+path))[0] for path in args.nims_paths]
 for i, nims_path in enumerate(sorted(nims_paths)):
-    print("BIDSifying path %s out of %s" % (str(i+1), str(len(nims_paths))))
+    to_write.write("BIDSifying path %s out of %s\n" % (str(i+1), str(len(nims_paths))))
     subj_path  = get_subj_path(nims_path, bids_dir, id_correction_dict)
     if subj_path == None:
-        print("Couldn't find subj_path for %s" % nims_path)
+        to_write.write("Couldn't find subj_path for %s\n" % nims_path)
         with open(error_file, 'a') as filey:
             filey.write("Couldn't find subj_path for %s\n" % nims_path)
         continue
     bids_subj(subj_path, bids_dir, nims_path)
+    to_write.flush()
 
 # add physio metadata
 if not os.path.exists(os.path.join(bids_dir, 'recording-cardiac_physio.json')):
@@ -411,3 +420,4 @@ if not os.path.exists(os.path.join(bids_dir, 'recording-respiratory_physio.json'
 # *** Cleanup
 # *****************************
 cleanup(bids_dir)
+f.close()
