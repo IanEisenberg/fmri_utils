@@ -420,4 +420,4 @@ if not os.path.exists(os.path.join(bids_dir, 'recording-respiratory_physio.json'
 # *** Cleanup
 # *****************************
 cleanup(bids_dir)
-f.close()
+to_write.close()
