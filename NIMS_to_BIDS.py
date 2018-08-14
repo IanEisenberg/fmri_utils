@@ -86,8 +86,7 @@ def bids_sbref(sub_id, sbref_dir, func_path, bids_dir):
     calibration scan to BIDS format. Assumes tasks are named appropriately
     (e.g. "[examinfo]_task_[task]_run_[run_number]_sbref")
     """
-    task_index = sbref_dir.index('task')
-    filename = sbref_dir[task_index:]
+    filename = '_'.join(os.path.basename(sbref_dir).split('_')[3:])
     sbref_files = glob.glob(os.path.join(sbref_dir,'*.nii.gz'))
     # remove files that are sometimes added, but are of no interest
     sbref_files = [i for i in sbref_files if 'phase' not in i]
@@ -130,9 +129,8 @@ def bids_task(sub_id, task_dir, func_path, bids_dir):
     to BIDS format. Assumes tasks are named appropriately
     (e.g. "[examinfo]_task_[task]_run_[run_number]_ssg")
     """
-    task_index = task_dir.index('task')
-    taskname = task_dir[task_index:]
-    task_file = [f for f in glob.glob(os.path.join(task_dir,'*.nii.gz')) if "fieldmap" not in f]
+    taskname = '_'.join(os.path.basename(task_dir).split('_')[3:])
+    task_file = [f for f in glob.glob(os.path.join(task_dir,'*1.nii.gz')) if "fieldmap" not in f]
     assert len(task_file) <= 1, "More than one func file found in directory %s" % task_dir
     if len(task_file) == 0:
         to_write.write('Skipping %s, no nii.gz file found\n' % task_dir)
@@ -283,14 +281,14 @@ def mkdir(path):
 # *****************************
 # *** Main BIDS function
 # *****************************
-def bids_subj(subj_path, bids_dir, nims_path):
+def bids_subj(subj_path, bids_dir, nims_path, skip_complete=False):
     """
     Takes a subject path (the BIDS path to the subject directory),
     a data path (the path to the BIDS directory), and a 
     nims_path (the path to the subject's data in the original format) 
     and moves/converts that subject's data to BIDS
     """
-    if os.path.exists(subj_path):
+    if os.path.exists(subj_path) and skip_complete:
         to_write.write("Path %s already exists. Skipping.\n\n" % subj_path)
     else:
         to_write.write("********************************************\n")
@@ -363,6 +361,7 @@ parser.add_argument('--study_id', default=None, help='Study ID. If not supplied,
 parser.add_argument('--id_correction', help='JSON file that lists subject id corrections for fmri scan IDs')
 parser.add_argument('--nims_paths', nargs='+', default=None)
 parser.add_argument('--write_out', default=None)
+parser.add_argument('--skip_complete', action='store_true')
 args, unknown = parser.parse_known_args()
 
 # directory with bids data
@@ -380,6 +379,8 @@ if args.write_out:
 else:
     write_out = '%s_NIMS_to_BIDS.txt' % study_id
 to_write = open(write_out, 'w')
+# whether to skip completed scans or check again
+skip_complete = args.skip_complete
 
 # set id_correction_dict if provided
 id_correction_dict = None
@@ -400,12 +401,13 @@ else:
 for i, nims_path in enumerate(sorted(nims_paths)):
     to_write.write("BIDSifying path %s out of %s\n" % (str(i+1), str(len(nims_paths))))
     subj_path  = get_subj_path(nims_path, bids_dir, id_correction_dict)
+    print('Subject Path: ', subj_path)
     if subj_path == None:
         to_write.write("Couldn't find subj_path for %s\n" % nims_path)
         with open(error_file, 'a') as filey:
             filey.write("Couldn't find subj_path for %s\n" % nims_path)
         continue
-    bids_subj(subj_path, bids_dir, nims_path)
+    bids_subj(subj_path, bids_dir, nims_path, skip_complete)
     to_write.flush()
 
 # add physio metadata
